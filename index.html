@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kubernetes Conflict Lab: Kafka vs EDB Postgres</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #0B0F19;
+      --bg-card: #111827;
+      --bg-card-hover: #1A2234;
+      --border-color: #1F2937;
+      --accent-blue: #38BDF8;
+      --accent-purple: #818CF8;
+      --accent-red: #F87171;
+      --accent-green: #34D399;
+      --accent-amber: #FBBF24;
+      --text-main: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding-bottom: 60px;
+    }
+
+    header {
+      background: linear-gradient(180deg, #131d31 0%, #0B0F19 100%);
+      border-bottom: 1px solid var(--border-color);
+      padding: 40px 24px;
+      text-align: center;
+      position: relative;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent-blue);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+      background: linear-gradient(90deg, #FFFFFF, #93C5FD, #C084FC);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      max-width: 800px;
+      margin: 0 auto 24px;
+    }
+
+    .btn-group {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background-color: #2563EB;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background-color: #1D4ED8;
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .btn-outline:hover {
+      background: var(--bg-card);
+      border-color: var(--accent-blue);
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 24px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    @media (max-width: 850px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card.conflict {
+      border-top: 4px solid var(--accent-red);
+    }
+
+    .card.resolved {
+      border-top: 4px solid var(--accent-green);
+    }
+
+    .card-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .node-box {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px dashed #374151;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .node-header {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .pod-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .pod-kafka {
+      background: rgba(249, 115, 22, 0.15);
+      border: 1px solid rgba(249, 115, 22, 0.3);
+      color: #FB923C;
+    }
+
+    .pod-edb {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #60A5FA;
+    }
+
+    .gauge-bar {
+      height: 8px;
+      background: #1F2937;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .gauge-fill-red {
+      height: 100%;
+      width: 98%;
+      background: var(--accent-red);
+    }
+
+    .gauge-fill-green {
+      height: 100%;
+      width: 52%;
+      background: var(--accent-green);
+    }
+
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 0.9rem;
+    }
+
+    .stats-table th, .stats-table td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .stats-table th {
+      background: #162032;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+    }
+
+    .badge-bad {
+      color: var(--accent-red);
+      font-weight: 700;
+    }
+
+    .badge-good {
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    .step-list {
+      margin-top: 24px;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #1E293B;
+      border: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+      color: var(--accent-blue);
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    pre {
+      background: #060911;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #E2E8F0;
+      overflow-x: auto;
+      margin-top: 8px;
+      position: relative;
+    }
+
+    code {
+      font-family: var(--font-mono);
+    }
+
+    .tech-deepdive {
+      background: #101625;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 32px;
+    }
+
+    .footer-link {
+      text-align: center;
+      margin-top: 40px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .footer-link a {
+      color: var(--accent-blue);
+      text-decoration: none;
+    }
+
+    .footer-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge">🚀 Kubernetes Resource Conflict Lab</div>
+    <h1>Apache Kafka &amp; EDB Postgres Contention</h1>
+    <p class="subtitle">
+      Demonstrating Kubernetes multi-tenant resource starvation on Minikube within GitHub Codespaces, and fixing it with podAntiAffinity.
+    </p>
+    <div class="btn-group">
+      <a href="https://codespaces.new/rifaterdemsahin/k8s-kafka-edb-conflict-lab" target="_blank" class="btn" style="background: #238636;">🚀 Open in GitHub Codespaces</a>
+      <a href="https://rifaterdemsahin.github.io/k8s-kafka-edb-conflict-lab/" class="btn btn-outline">🌐 GitHub Pages Site</a>
+      <a href="#kagent" class="btn btn-outline">🤖 Kagent AI SRE Monitor</a>
+      <a href="#runbook" class="btn btn-outline">Runbook</a>
+      <a href="#comparison" class="btn btn-outline">Benchmark Comparison</a>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ARCHITECTURE COMPARISON -->
+    <section id="architecture">
+      <div class="grid-2">
+        
+        <!-- Scenario 1 Card -->
+        <div class="card conflict">
+          <div class="card-title">
+            <span>💥 Scenario 1: Unbalanced Colocation</span>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
+            Both Kafka &amp; EDB Postgres are pinned to worker node <code>minikube-m02</code> via <code>nodeSelector</code>.
+          </p>
+
+          <div class="node-box">
+            <div class="node-header">
+              <span>Node: minikube-m02 (Worker)</span>
+              <span class="badge-bad">CPU/IO Overloaded (98%)</span>
+            </div>
+            <div class="pod-item pod-kafka">
+              <span>📬 Kafka Broker (Strimzi)</span>
+              <span>Req: 1.2 CPU | 1.5GB RAM</span>
+            </div>
+            <div class="pod-item pod-edb">
+              <span>🐘 EDB PostgreSQL (CloudNativePG)</span>
+              <span>Req: 1.2 CPU | 1.0GB RAM</span>
+            </div>
+            <div class="gauge-bar">
+              <div class="gauge-fill-red"></div>
+            </div>
+          </div>
+
+          <div class="node-box" style="opacity: 0.5;">
+            <div class="node-header">
+              <span>Node: minikube (Control-Plane)</span>
+              <span>Idle (8% Usage)</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding: 10px;">
+              No application workloads scheduled
+            </div>
+          </div>
+
+          <div style="font-size: 0.85rem; color: var(--accent-red); margin-top: 12px;">
+            ⚠️ <strong>Impact:</strong> CFS CPU throttling delays PostgreSQL WAL writes. Kafka message flush serializes with Postgres queries, dropping TPS by 70%.
+          </div>
+        </div>
+
+        <!-- Scenario 2 Card -->
+        <div class="card resolved">
+          <div class="card-title">
+            <span>🛡️ Scenario 2: Pod Anti-Affinity Resolution</span>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
+            Workloads enforce mutual exclusion via <code>podAntiAffinity</code> across <code>kubernetes.io/hostname</code>.
+          </p>
+
+          <div class="node-box">
+            <div class="node-header">
+              <span>Node: minikube</span>
+              <span class="badge-good">Balanced (50% Usage)</span>
+            </div>
+            <div class="pod-item pod-kafka">
+              <span>📬 Kafka Broker (Strimzi)</span>
+              <span>Dedicated 2 CPUs &amp; 4GB RAM</span>
+            </div>
+            <div class="gauge-bar">
+              <div class="gauge-fill-green"></div>
+            </div>
+          </div>
+
+          <div class="node-box">
+            <div class="node-header">
+              <span>Node: minikube-m02</span>
+              <span class="badge-good">Balanced (52% Usage)</span>
+            </div>
+            <div class="pod-item pod-edb">
+              <span>🐘 EDB PostgreSQL (CloudNativePG)</span>
+              <span>Dedicated 2 CPUs &amp; 4GB RAM</span>
+            </div>
+            <div class="gauge-bar">
+              <div class="gauge-fill-green"></div>
+            </div>
+          </div>
+
+          <div style="font-size: 0.85rem; color: var(--accent-green); margin-top: 12px;">
+            ✅ <strong>Result:</strong> Zero CPU throttling. Dedicated Linux page cache &amp; disk I/O queues. Stable latency and 4x TPS throughput.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- BENCHMARK COMPARISON TABLE -->
+    <section id="comparison" class="card" style="margin-bottom: 40px;">
+      <h2 style="font-size: 1.4rem; margin-bottom: 12px;">📊 Benchmark Results: Contention vs Isolation</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        Measured concurrently using <code>pgbench</code> (16 clients, 4 threads, scale factor 25) and <code>kafka-producer-perf-test</code> (350,000 records).
+      </p>
+
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th>Metric &amp; Workload</th>
+            <th>Scenario 1 (Colocated Conflict)</th>
+            <th>Scenario 2 (Anti-Affinity Resolved)</th>
+            <th>Improvement Factor</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>PostgreSQL Transactions/Sec (TPS)</strong></td>
+            <td class="badge-bad">~420 TPS (Heavily jittered)</td>
+            <td class="badge-good">~2,480 TPS (Smooth)</td>
+            <td><strong>+ 490% Throughput</strong></td>
+          </tr>
+          <tr>
+            <td><strong>PostgreSQL Average Query Latency</strong></td>
+            <td class="badge-bad">38.2 ms (Spikes up to 180ms)</td>
+            <td class="badge-good">6.4 ms (Consistently sub-10ms)</td>
+            <td><strong>- 83% Latency Drop</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Kafka Ingestion Rate (Records/sec)</strong></td>
+            <td class="badge-bad">12,400 rec/sec</td>
+            <td class="badge-good">48,900 rec/sec</td>
+            <td><strong>+ 294% Ingestion Speed</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Kafka Producer p99 Latency</strong></td>
+            <td class="badge-bad">195.4 ms</td>
+            <td class="badge-good">18.6 ms</td>
+            <td><strong>- 90% Tail Latency</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Worker Node CPU Saturation</strong></td>
+            <td class="badge-bad">minikube-m02 @ 98-100%</td>
+            <td class="badge-good">Split ~50% across both nodes</td>
+            <td><strong>Balanced Cluster</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- KAGENT AI SRE & PROMETHEUS MONITORING SECTION -->
+    <section id="kagent" class="card" style="margin-bottom: 40px; border-top: 4px solid var(--accent-purple);">
+      <div class="card-title">
+        <span>🤖 Autonomous Monitoring &amp; Alerting with Kagent AI Agent</span>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.92rem; margin-bottom: 16px;">
+        Instead of relying solely on manual observation, this lab deploys <strong>Prometheus Alertmanager</strong> rules and the <strong>Kagent Kubernetes-native AI SRE Agent</strong> (<code>kagent.dev</code>).
+      </p>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <div style="background: #0d131f; padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <div style="color: var(--accent-purple); font-weight: 700; margin-bottom: 8px;">🔥 Active Prometheus Alert Rules</div>
+          <ul style="color: var(--text-muted); font-size: 0.85rem; padding-left: 18px; line-height: 1.8;">
+            <li><code>StatefulWorkloadColocationDetected</code> (Critical: Kafka + Postgres on same host)</li>
+            <li><code>NodeCPUOverloaded</code> (Critical: Node CPU &gt; 85%)</li>
+            <li><code>ContainerCPUThrottlingHigh</code> (Warning: CFS throttling &gt; 25%)</li>
+            <li><code>DiskIOSlowFlush</code> (Warning: Saturated disk write queues)</li>
+          </ul>
+        </div>
+        <div style="background: #0d131f; padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <div style="color: var(--accent-blue); font-weight: 700; margin-bottom: 8px;">🧠 Kagent Agent Autonomous Actions</div>
+          <ul style="color: var(--text-muted); font-size: 0.85rem; padding-left: 18px; line-height: 1.8;">
+            <li>Correlates Prometheus metric spikes with Kubernetes pod node assignments</li>
+            <li>Detects dirty page cache evictions &amp; WAL fsync starvation</li>
+            <li>Issues diagnostic triage report and automated remediation recommendation</li>
+            <li>Verifies post-remediation node balance and workload stabilization</li>
+          </ul>
+        </div>
+      </div>
+
+      <p style="color: var(--text-muted); font-size: 0.88rem;">
+        Deploy monitoring and query the agent in real time:
+      </p>
+      <pre><code># Deploy Prometheus &amp; Kagent AI SRE Agent
+./setup-monitoring-kagent.sh
+
+# Query live Kagent diagnosis &amp; alert triage
+./query-kagent.sh</code></pre>
+    </section>
+
+    <!-- RUNBOOK -->
+    <section id="runbook" class="card">
+      <h2 style="font-size: 1.4rem; margin-bottom: 16px;">🚀 Quickstart &amp; Execution Runbook</h2>
+
+      <div class="step-list">
+        
+        <div class="step-item">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Spin Up Environment in GitHub Codespaces</div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+              The repository includes a complete <code>.devcontainer</code> setup with Docker-in-Docker, Helm, and Minikube pre-configured. Minikube automatically starts with 2 nodes (4 CPUs, 8GB RAM).
+            </p>
+            <pre><code>minikube status
+kubectl get nodes -o wide</code></pre>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Install Strimzi &amp; CloudNativePG Operators</div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+              Deploys the production-grade operators for both Apache Kafka and EnterpriseDB / CloudNativePG Postgres via Helm.
+            </p>
+            <pre><code>./setup-operators.sh</code></pre>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Deploy Scenario 1 &amp; Observe Contention</div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+              Both clusters are deployed onto <code>minikube-m02</code>. The benchmark triggers simultaneous load via Kubernetes Jobs.
+            </p>
+            <pre><code>./deploy-scenario-1.sh
+./test-conflict.sh</code></pre>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">Apply Recommendation (podAntiAffinity) &amp; Verify Recovery</div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+              Applies the updated manifests that inject pod mutual-exclusion rules, rebalancing Kafka and Postgres across distinct worker nodes.
+            </p>
+            <pre><code>./apply-recommendation.sh
+./test-resolved.sh</code></pre>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TECHNICAL DEEP DIVE -->
+    <section class="tech-deepdive">
+      <h3 style="margin-bottom: 12px;">🧠 Root Cause Analysis: Why Colocating Kafka &amp; Postgres Fails</h3>
+      <p style="color: var(--text-muted); font-size: 0.92rem; margin-bottom: 12px;">
+        Both Apache Kafka and PostgreSQL are high-throughput stateful data services with distinct, aggressive I/O profiles:
+      </p>
+      <ul style="color: var(--text-muted); font-size: 0.9rem; padding-left: 20px; line-height: 1.8;">
+        <li><strong>Page Cache Invalidation:</strong> Kafka relies heavily on the Linux OS Page Cache and sequential append-only writes, while PostgreSQL relies on both its internal shared buffers and filesystem caching. When sharing a node, Kafka flushes can evict PostgreSQL working memory pages from the kernel cache.</li>
+        <li><strong>CFS Quota Throttling:</strong> Under CPU resource limits, the Linux Completely Fair Scheduler (CFS) enforces quotas over 100ms periods. Heavy Kafka message compression and simultaneous Postgres query planning trigger aggressive CFS throttling.</li>
+        <li><strong>WAL fsync Stalls:</strong> Both workloads write write-ahead logs (WAL) to disk requiring fsync calls. On a single node disk, WAL flushes queue behind Kafka segment commits, causing dramatic latency spikes.</li>
+      </ul>
+    </section>
+
+    <div class="footer-link">
+      <p>Kubernetes Resource Conflict Lab • Designed for Minikube on GitHub Codespaces</p>
+    </div>
+
+  </main>
+
+</body>
+</html>

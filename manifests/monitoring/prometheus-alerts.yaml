@@ -1,0 +1,56 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kafka-edb-conflict-alerts
+  namespace: monitoring
+  labels:
+    role: alert-rules
+    app.kubernetes.io/part-of: kafka-edb-lab
+spec:
+  groups:
+    - name: kafka-edb-resource-conflicts
+      rules:
+        # Alert 1: Node CPU Overloaded
+        - alert: NodeCPUOverloaded
+          expr: (1 - avg by (node) (rate(node_cpu_seconds_total{mode="idle"}[1m]))) * 100 > 85
+          for: 15s
+          labels:
+            severity: critical
+            category: resource-exhaustion
+            node: "{{ $labels.node }}"
+          annotations:
+            summary: "Node {{ $labels.node }} CPU is above 85%"
+            description: "Node {{ $labels.node }} is under severe CPU saturation (>85%) due to colocated heavy stateful workloads."
+
+        # Alert 2: Container CPU Throttling High
+        - alert: ContainerCPUThrottlingHigh
+          expr: rate(container_cpu_cfs_throttled_periods_total{namespace="lab-workloads"}[1m]) / rate(container_cpu_cfs_periods_total{namespace="lab-workloads"}[1m]) * 100 > 25
+          for: 10s
+          labels:
+            severity: warning
+            category: cpu-throttling
+          annotations:
+            summary: "Container {{ $labels.container }} CPU throttled > 25%"
+            description: "CFS quota throttling is choking container {{ $labels.container }} in pod {{ $labels.pod }}."
+
+        # Alert 3: Critical Workload Colocation
+        - alert: StatefulWorkloadColocationDetected
+          expr: count by (node) (kube_pod_info{namespace="lab-workloads", pod=~"kafka.*|edb.*"}) > 1
+          for: 5s
+          labels:
+            severity: critical
+            remediation: "apply-pod-anti-affinity"
+          annotations:
+            summary: "Dangerous Kafka and Postgres Colocation on {{ $labels.node }}"
+            description: "Both Kafka and EDB Postgres are scheduled on the exact same node {{ $labels.node }}. Severe I/O and CPU contention imminent."
+
+        # Alert 4: Disk I/O Queue High Latency
+        - alert: DiskIOSlowFlush
+          expr: rate(node_disk_io_time_seconds_total[1m]) > 0.8
+          for: 15s
+          labels:
+            severity: warning
+            category: disk-io
+          annotations:
+            summary: "High Disk I/O Pressure on Node"
+            description: "Disk write queues are saturated. PostgreSQL WAL fsync and Kafka segment flushes are colliding."

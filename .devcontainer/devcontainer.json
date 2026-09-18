@@ -1,0 +1,48 @@
+{
+  "name": "K8s Kafka vs EDB Conflict Lab",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": "true"
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "minikube": "latest",
+      "helm": "latest"
+    }
+  },
+  "forwardPorts": [
+    30080,
+    30085,
+    9092,
+    5432
+  ],
+  "portsAttributes": {
+    "30085": {
+      "label": "Lab Dashboard",
+      "onAutoForward": "openBrowser"
+    },
+    "9092": {
+      "label": "Kafka Broker",
+      "onAutoForward": "ignore"
+    },
+    "5432": {
+      "label": "EDB PostgreSQL",
+      "onAutoForward": "ignore"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh"
+}

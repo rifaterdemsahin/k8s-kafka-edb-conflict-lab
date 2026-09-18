@@ -1,0 +1,194 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kagent
+  labels:
+    app.kubernetes.io/name: kagent
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kagent-sre-agent
+  namespace: kagent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kagent-sre-agent-role
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "services", "namespaces", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["prometheuses", "alertmanagers", "prometheusrules"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["kafka.strimzi.io"]
+    resources: ["kafkas", "kafkanodepools"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kagent-sre-agent-binding
+subjects:
+  - kind: ServiceAccount
+    name: kagent-sre-agent
+    namespace: kagent
+roleRef:
+  kind: ClusterRole
+  name: kagent-sre-agent-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kagent-monitoring-agent
+  namespace: kagent
+  labels:
+    app.kubernetes.io/name: kagent-monitoring-agent
+    app.kubernetes.io/component: sre-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kagent-monitoring-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kagent-monitoring-agent
+    spec:
+      serviceAccountName: kagent-sre-agent
+      containers:
+        - name: kagent-agent
+          image: python:3.11-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo ">>> [kagent] Starting Kagent Kubernetes AI SRE Monitoring Agent..."
+              cat << 'EOF' > /app/agent.py
+              import os
+              import time
+              import json
+              import urllib.request
+              import subprocess
+
+              PROMETHEUS_URL = os.environ.get("PROMETHEUS_URL", "http://prometheus-server.monitoring.svc.cluster.local:80")
+
+              def log(msg):
+                  print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [kagent-sre-agent] {msg}", flush=True)
+
+              def get_node_topology():
+                  try:
+                      out = subprocess.check_output(
+                          ["kubectl", "get", "pods", "-n", "lab-workloads", "-o", "json"]
+                      )
+                      data = json.loads(out)
+                      placement = {}
+                      for item in data.get("items", []):
+                          name = item["metadata"]["name"]
+                          node = item["spec"].get("nodeName", "pending")
+                          placement[name] = node
+                      return placement
+                  except Exception as e:
+                      return {"error": str(e)}
+
+              log("Kagent AI SRE Agent initialized. Watching Prometheus Alerts and Node Topology...")
+              
+              while True:
+                  placement = get_node_topology()
+                  kafka_nodes = [node for pod, node in placement.items() if "kafka" in pod and "load" not in pod]
+                  pg_nodes = [node for pod, node in placement.items() if "postgres" in pod and "load" not in pod]
+
+                  # Detect Colocation
+                  if kafka_nodes and pg_nodes:
+                      shared = set(kafka_nodes).intersection(set(pg_nodes))
+                      if shared:
+                          conflict_node = list(shared)[0]
+                          log(f"🚨 [ALERT DETECTED] StatefulWorkloadColocationDetected on node: {conflict_node}")
+                          log(f"   Analysis: Apache Kafka ({kafka_nodes}) and EDB Postgres ({pg_nodes}) reside on the SAME node.")
+                          log(f"   Diagnosis: CPU CFS quota throttling and WAL disk serialization imminent under load.")
+                          log(f"   💡 Recommendation: Apply podAntiAffinity rule to segregate workloads across available nodes.")
+                      else:
+                          log(f"✅ [HEALTHY] Workloads isolated: Kafka on {kafka_nodes}, Postgres on {pg_nodes}. Resource balance optimal.")
+                  else:
+                      log("⏳ Waiting for lab workloads (Kafka / EDB Postgres) to be scheduled...")
+                  
+                  time.sleep(10)
+              EOF
+
+              # Install kubectl
+              curl -sLO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl && mv kubectl /usr/local/bin/
+
+              mkdir -p /app
+              cd /app
+              python3 -u /app/agent.py
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+# Declarative Kagent Agent CRD definition (kagent.dev)
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: agents.kagent.dev
+spec:
+  group: kagent.dev
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+  scope: Namespaced
+  names:
+    plural: agents
+    singular: agent
+    kind: Agent
+    shortNames:
+      - kag
+---
+apiVersion: kagent.dev/v1alpha1
+kind: Agent
+metadata:
+  name: sre-conflict-monitor
+  namespace: kagent
+spec:
+  role: "SRE Kubernetes Reliability Engineer"
+  description: "Monitors Prometheus alerts and mitigates Kafka-EDB resource contention"
+  systemPrompt: |
+    You are an autonomous Kubernetes SRE Agent.
+    Continuously observe Prometheus alerts for:
+    - NodeCPUOverloaded
+    - ContainerCPUThrottlingHigh
+    - StatefulWorkloadColocationDetected
+    When colocation on minikube-m02 is detected, diagnose cgroup quota depletion and WAL write stalls,
+    and trigger the remediation podAntiAffinity manifest.
+  tools:
+    - name: prometheus
+      mcpServer: "http://prometheus-server.monitoring.svc.cluster.local:80"
+    - name: kubernetes
+      verbs: ["get", "list", "patch"]

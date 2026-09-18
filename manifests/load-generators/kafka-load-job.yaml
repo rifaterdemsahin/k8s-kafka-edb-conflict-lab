@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-load-generator
+  namespace: lab-workloads
+  labels:
+    app.kubernetes.io/name: kafka-load
+    app.kubernetes.io/part-of: kafka-edb-lab
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka-load
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: kafka-perf-producer
+          image: quay.io/strimzi/kafka:0.41.0-kafka-3.7.0
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              BOOTSTRAP="kafka-cluster-kafka-bootstrap.lab-workloads.svc:9092"
+              TOPIC="perf-test-topic"
+
+              echo ">>> Checking connectivity to Kafka bootstrap server ($BOOTSTRAP)..."
+              timeout 60 bash -c "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server $BOOTSTRAP --list >/dev/null 2>&1; do sleep 2; done"
+
+              echo ">>> Starting aggressive Kafka Producer Performance Test..."
+              echo ">>> Records: 350000, Size: 1024 bytes, Target throughput: Uncapped (-1)"
+              /opt/kafka/bin/kafka-producer-perf-test.sh \
+                --topic "$TOPIC" \
+                --num-records 350000 \
+                --record-size 1024 \
+                --throughput -1 \
+                --producer-props \
+                  bootstrap.servers="$BOOTSTRAP" \
+                  acks=1 \
+                  batch.size=65536 \
+                  linger.ms=20 \
+                  compression.type=lz4 \
+                  buffer.memory=67108864 \
+                | tee /tmp/kafka-perf-results.txt
+
+              echo ">>> Kafka load test completed."
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
