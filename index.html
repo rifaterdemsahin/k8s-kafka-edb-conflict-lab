@@ -38,6 +38,77 @@
       padding-bottom: 60px;
     }
 
+    /* SHARED TOP NAVIGATION */
+    .navbar {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-main);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .nav-logo {
+      font-size: 1.3rem;
+    }
+
+    .nav-menu {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: var(--accent-blue);
+    }
+
+    .nav-link.active {
+      font-weight: 600;
+    }
+
+    .nav-btn-action {
+      background: #238636;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: background 0.2s ease;
+    }
+
+    .nav-btn-action:hover {
+      background: #2ea043;
+    }
+
     header {
       background: linear-gradient(180deg, #131d31 0%, #0B0F19 100%);
       border-bottom: 1px solid var(--border-color);
@@ -333,6 +404,24 @@
 </head>
 <body>
 
+  <!-- SHARED TOP NAVIGATION -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <span class="nav-logo">⚡</span>
+        <span class="nav-title">K8s Conflict Lab</span>
+      </a>
+      <div class="nav-menu">
+        <a href="index.html" class="nav-link active">🔬 Lab &amp; Architecture</a>
+        <a href="#kagent" class="nav-link">🤖 Kagent AI SRE</a>
+        <a href="#runbook" class="nav-link">📖 Runbook</a>
+        <a href="#comparison" class="nav-link">📊 Benchmarks</a>
+        <a href="costs.html" class="nav-link">💰 PoC Hosting Costs</a>
+        <a href="https://codespaces.new/rifaterdemsahin/k8s-kafka-edb-conflict-lab" target="_blank" class="nav-btn-action">🚀 Open Codespaces</a>
+      </div>
+    </div>
+  </nav>
+
   <header>
     <div class="badge">🚀 Kubernetes Resource Conflict Lab</div>
     <h1>Apache Kafka &amp; EDB Postgres Contention</h1>
@@ -341,7 +430,7 @@
     </p>
     <div class="btn-group">
       <a href="https://codespaces.new/rifaterdemsahin/k8s-kafka-edb-conflict-lab" target="_blank" class="btn" style="background: #238636;">🚀 Open in GitHub Codespaces</a>
-      <a href="https://rifaterdemsahin.github.io/k8s-kafka-edb-conflict-lab/" class="btn btn-outline">🌐 GitHub Pages Site</a>
+      <a href="costs.html" class="btn" style="background: #D97706;">💰 PoC Hosting Costs</a>
       <a href="#kagent" class="btn btn-outline">🤖 Kagent AI SRE Monitor</a>
       <a href="#runbook" class="btn btn-outline">Runbook</a>
       <a href="#comparison" class="btn btn-outline">Benchmark Comparison</a>
@@ -601,8 +690,22 @@ kubectl get nodes -o wide</code></pre>
       </ul>
     </section>
 
+    <!-- POC HOSTING COST OPTIONS CALLOUT -->
+    <section class="card" style="margin-top: 32px; border: 1px solid var(--accent-amber); background: linear-gradient(180deg, #181d2a 0%, #111827 100%);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <span style="background: rgba(251, 191, 36, 0.15); color: var(--accent-amber); border: 1px solid rgba(251, 191, 36, 0.3); padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Infrastructure Economics</span>
+          <h3 style="font-size: 1.3rem; font-weight: 700; margin-top: 8px; color: #fff;">PoC Hosting Cost Options (~$21 - $100/mo)</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; max-width: 750px; margin-top: 4px;">
+            Compare running nested K3s on <strong>Fly.io</strong> (~$25/mo), migrating to lightweight managed K8s on <strong>Civo</strong> (~$21.73/mo), or deploying to hyperscale <strong>Google GKE Autopilot</strong> (~$100/mo).
+          </p>
+        </div>
+        <a href="costs.html" class="btn" style="background: #D97706; padding: 12px 24px; font-size: 1rem;">View Cost Breakdown &amp; Analysis →</a>
+      </div>
+    </section>
+
     <div class="footer-link">
-      <p>Kubernetes Resource Conflict Lab • Designed for Minikube on GitHub Codespaces</p>
+      <p>Kubernetes Resource Conflict Lab • <a href="costs.html">PoC Hosting Cost Options</a> • Designed for Minikube on GitHub Codespaces</p>
     </div>
 
   </main>

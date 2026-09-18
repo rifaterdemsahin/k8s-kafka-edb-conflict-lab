@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PoC Hosting Cost Options - Kubernetes Kafka vs EDB Conflict Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #0B0F19;
+      --bg-card: #111827;
+      --bg-card-hover: #1A2234;
+      --border-color: #1F2937;
+      --accent-blue: #38BDF8;
+      --accent-purple: #818CF8;
+      --accent-red: #F87171;
+      --accent-green: #34D399;
+      --accent-amber: #FBBF24;
+      --text-main: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding-bottom: 60px;
+    }
+
+    /* SHARED TOP NAVIGATION */
+    .navbar {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-main);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .nav-logo {
+      font-size: 1.3rem;
+    }
+
+    .nav-menu {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: var(--accent-blue);
+    }
+
+    .nav-link.active {
+      font-weight: 600;
+    }
+
+    .nav-btn-action {
+      background: #238636;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: background 0.2s ease;
+    }
+
+    .nav-btn-action:hover {
+      background: #2ea043;
+    }
+
+    header {
+      background: linear-gradient(180deg, #131d31 0%, #0B0F19 100%);
+      border-bottom: 1px solid var(--border-color);
+      padding: 40px 24px;
+      text-align: center;
+      position: relative;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent-blue);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+      background: linear-gradient(90deg, #FFFFFF, #93C5FD, #C084FC);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 850px;
+      margin: 0 auto 24px;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 24px;
+    }
+
+    /* 3-COLUMN OPTION CARDS */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card.highlight {
+      border: 2px solid var(--accent-blue);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+    }
+
+    .card-badge {
+      display: inline-block;
+      align-self: flex-start;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .badge-current {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .badge-budget {
+      background: rgba(52, 211, 153, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+    }
+
+    .badge-hyperscale {
+      background: rgba(129, 140, 248, 0.15);
+      color: var(--accent-purple);
+      border: 1px solid rgba(129, 140, 248, 0.3);
+    }
+
+    .option-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .option-desc {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      margin-bottom: 16px;
+      min-height: 42px;
+    }
+
+    .price-tag {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .price-period {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    .feature-list {
+      list-style: none;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-top: auto;
+      border-top: 1px solid var(--border-color);
+      padding-top: 16px;
+    }
+
+    .feature-list li {
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feature-list li span.check {
+      color: var(--accent-green);
+      font-weight: bold;
+    }
+
+    /* SIDE BY SIDE TABLE */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 40px;
+      overflow-x: auto;
+    }
+
+    .cost-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+
+    .cost-table th, .cost-table td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .cost-table th {
+      background: #162032;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .cost-table td:first-child {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .cost-table tr:last-child td {
+      border-bottom: none;
+      font-weight: 700;
+      font-size: 1.05rem;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .total-price {
+      color: var(--accent-blue);
+      font-weight: 800;
+    }
+
+    .deepdive-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .deepdive-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .deepdive-box {
+      background: #0d131f;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 18px;
+    }
+
+    .deepdive-box h4 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    .deepdive-box p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .footer-link {
+      text-align: center;
+      margin-top: 40px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .footer-link a {
+      color: var(--accent-blue);
+      text-decoration: none;
+    }
+
+    .footer-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SHARED TOP NAVIGATION -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <span class="nav-logo">⚡</span>
+        <span class="nav-title">K8s Conflict Lab</span>
+      </a>
+      <div class="nav-menu">
+        <a href="index.html" class="nav-link">🔬 Lab &amp; Architecture</a>
+        <a href="index.html#kagent" class="nav-link">🤖 Kagent AI SRE</a>
+        <a href="index.html#runbook" class="nav-link">📖 Runbook</a>
+        <a href="index.html#comparison" class="nav-link">📊 Benchmarks</a>
+        <a href="costs.html" class="nav-link active">💰 PoC Hosting Costs</a>
+        <a href="https://codespaces.new/rifaterdemsahin/k8s-kafka-edb-conflict-lab" target="_blank" class="nav-btn-action">🚀 Open Codespaces</a>
+      </div>
+    </div>
+  </nav>
+
+  <header>
+    <div class="badge">💰 Infrastructure Economics &amp; Architecture</div>
+    <h1>PoC Hosting Cost Options</h1>
+    <p class="subtitle">
+      For a Proof of Concept project, cost structure varies significantly depending on whether you run nested k3s inside Fly.io (what this project uses today), migrate to a lightweight managed K8s provider (Civo), or opt for a managed hyperscale service (GKE). Estimates below are for a minimal PoC cluster (~2 vCPU / 4GB RAM).
+    </p>
+  </header>
+
+  <main>
+
+    <!-- 3-OPTION CARDS -->
+    <div class="grid-3">
+
+      <!-- OPTION 1 -->
+      <div class="card highlight">
+        <span class="card-badge badge-current">CURRENT INFRASTRUCTURE</span>
+        <h3 class="option-title">Nested k3s on Fly.io</h3>
+        <p class="option-desc">SPEC-018 — <code>kagent-k3s</code> app, region <code>lhr</code> (London)</p>
+        <div class="price-tag">~$25.00</div>
+        <div class="price-period">per month estimate</div>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Zero control plane fee</li>
+          <li><span class="check">✓</span> <code>shared-cpu-4x</code> (2 vCPU, 4GB RAM)</li>
+          <li><span class="check">✓</span> 10GB persistent NVMe volume</li>
+          <li><span class="check">✓</span> Fast edge cold boot and suspend</li>
+          <li><span class="check">✓</span> Pre-configured with kagent &amp; k3s</li>
+        </ul>
+      </div>
+
+      <!-- OPTION 2 -->
+      <div class="card">
+        <span class="card-badge badge-budget">LIGHTWEIGHT MANAGED K8S</span>
+        <h3 class="option-title">Civo</h3>
+        <p class="option-desc">Lightweight managed Kubernetes powered by native K3s nodes</p>
+        <div class="price-tag">~$21.73</div>
+        <div class="price-period">per month estimate</div>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Free managed control plane ($0)</li>
+          <li><span class="check">✓</span> Medium worker node (2 vCPU, 4GB RAM)</li>
+          <li><span class="check">✓</span> 50GB storage included by default</li>
+          <li><span class="check">✓</span> Free unlimited bandwidth / egress</li>
+          <li><span class="check">✓</span> Fast node creation (~90 seconds)</li>
+        </ul>
+      </div>
+
+      <!-- OPTION 3 -->
+      <div class="card">
+        <span class="card-badge badge-hyperscale">HYPERSCALER MANAGED</span>
+        <h3 class="option-title">Google GKE Autopilot</h3>
+        <p class="option-desc">Enterprise hyperscale Kubernetes with Google SRE managed control plane</p>
+        <div class="price-tag">~$100.00</div>
+        <div class="price-period">per month estimate</div>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Enterprise 99.95% SLA control plane</li>
+          <li><span class="check">✓</span> Google Cloud VPC &amp; IAM integration</li>
+          <li><span class="check">✓</span> Pod-level pay-per-use billing</li>
+          <li><span class="check">✓</span> Automatic cluster patching &amp; repair</li>
+          <li><span class="check">✓</span> ~$73.00/mo base cluster management fee</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- SIDE BY SIDE TABLE -->
+    <div class="table-container">
+      <h2 style="font-size: 1.4rem; margin-bottom: 16px;">📊 Side-by-Side Monthly Cost Estimate</h2>
+      <table class="cost-table">
+        <thead>
+          <tr>
+            <th>Cost Category</th>
+            <th>Option 1: Nested k3s on Fly.io (Current)</th>
+            <th>Option 2: Lightweight Managed K8s (e.g., Civo)</th>
+            <th>Option 3: Hyperscaler (e.g., Google GKE Autopilot)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Control Plane Fee</td>
+            <td>$0</td>
+            <td>$0</td>
+            <td>~$73.00/mo ($0.10/hr)</td>
+          </tr>
+          <tr>
+            <td>Worker Compute<br><span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">(2 vCPU, 4GB RAM)</span></td>
+            <td>~$23.66/mo (shared-cpu-4x)</td>
+            <td>~$21.73/mo (Medium Node)</td>
+            <td>~$25.00/mo (Pod usage estimate)</td>
+          </tr>
+          <tr>
+            <td>Persistent Storage<br><span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">(10GB NVMe)</span></td>
+            <td>~$1.50/mo ($0.15/GB)</td>
+            <td>Included (50GB default)</td>
+            <td>~$1.30/mo</td>
+          </tr>
+          <tr>
+            <td>Egress / Bandwidth</td>
+            <td>Free / ~$0.20 (&lt;10GB included)</td>
+            <td>Unlimited / Free</td>
+            <td>~$0.08–$0.12/GB</td>
+          </tr>
+          <tr>
+            <td>Estimated PoC Total</td>
+            <td class="total-price">~$25.00/mo</td>
+            <td class="total-price">~$21.73/mo</td>
+            <td class="total-price">~$100.00/mo</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ARCHITECTURAL TRADE-OFFS -->
+    <div class="card">
+      <h2 style="font-size: 1.4rem; margin-bottom: 12px;">🧠 Architectural Suitability for Kafka, EDB &amp; Kagent AI</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
+        Choosing between these options depends on the lifecycle stage of your Kubernetes project and stateful performance requirements:
+      </p>
+
+      <div class="deepdive-grid">
+        <div class="deepdive-box">
+          <h4 style="color: var(--accent-blue);">Nested k3s on Fly.io (Current)</h4>
+          <p>
+            <strong>Best For:</strong> Self-contained, lightweight PoC experiments and ephemeral preview environments.
+            <br><br>
+            <strong>Trade-offs:</strong> Runs K3s inside a Firecracker microVM. While cost-efficient ($25/mo), running heavy kernel I/O (Kafka page cache &amp; PostgreSQL WAL) inside nested virtualization adds slight virtualization translation overhead under extreme benchmark saturation.
+          </p>
+        </div>
+
+        <div class="deepdive-box">
+          <h4 style="color: var(--accent-green);">Lightweight Managed K8s (Civo)</h4>
+          <p>
+            <strong>Best For:</strong> Multi-node development clusters and cost-sensitive teams requiring true bare-metal/VM node separation.
+            <br><br>
+            <strong>Trade-offs:</strong> Lowest price point (~$21.73/mo) with zero control plane charges. Real independent worker nodes allow realistic testing of <code>podAntiAffinity</code> and multi-zone failovers without hyperscaler price overhead.
+          </p>
+        </div>
+
+        <div class="deepdive-box">
+          <h4 style="color: var(--accent-purple);">Google GKE Autopilot</h4>
+          <p>
+            <strong>Best For:</strong> Production promotion, strict compliance, enterprise multi-tenancy, and hyperscaler VPC peering.
+            <br><br>
+            <strong>Trade-offs:</strong> Fixed $73/mo cluster management charge makes single-pod PoCs expensive (~$100/mo). However, for production Kafka &amp; EDB workloads, GKE provides guaranteed IOPS, NVMe SSD classes, and managed cluster security patches.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-link">
+      <p>
+        <a href="index.html">← Back to Lab Overview &amp; Runbook</a> | 
+        <a href="https://github.com/rifaterdemsahin/k8s-kafka-edb-conflict-lab">GitHub Repository</a> | 
+        <a href="https://codespaces.new/rifaterdemsahin/k8s-kafka-edb-conflict-lab" target="_blank">Launch in Codespaces</a>
+      </p>
+    </div>
+
+  </main>
+
+</body>
+</html>

@@ -383,8 +383,27 @@ To reset the cluster and delete all lab workloads, jobs, and generated logs:
 
 ---
 
+## 💰 PoC Hosting Cost Options
+
+For a Proof of Concept (PoC) project, cost structure varies significantly depending on whether you run nested k3s inside Fly.io (what this project uses today), migrate to a lightweight managed K8s provider (Civo), or opt for a managed hyperscale service (GKE). Estimates below are for a minimal PoC cluster (~2 vCPU / 4GB RAM):
+
+| Cost Category | Option 1: Nested k3s on Fly.io (Current) | Option 2: Lightweight Managed K8s (e.g., Civo) | Option 3: Hyperscaler (e.g., Google GKE Autopilot) |
+| :--- | :--- | :--- | :--- |
+| **Status / Spec** | **CURRENT** (SPEC-018 `kagent-k3s`, region `lhr`) | Lightweight managed K3s | Enterprise managed control plane |
+| **Control Plane Fee** | **$0** | **$0** | **~$73.00/mo** ($0.10/hr) |
+| **Worker Compute** (2 vCPU, 4GB RAM) | **~$23.66/mo** (`shared-cpu-4x`) | **~$21.73/mo** (Medium Node) | **~$25.00/mo** (Pod usage estimate) |
+| **Persistent Storage** (10GB NVMe) | **~$1.50/mo** ($0.15/GB) | **Included** (50GB default) | **~$1.30/mo** |
+| **Egress / Bandwidth** | **Free / ~$0.20** (&lt;10GB included) | **Unlimited / Free** | **~$0.08–$0.12/GB** |
+| **Estimated PoC Total** | **~$25.00/mo** | **~$21.73/mo** | **~$100.00/mo** |
+
+👉 Detailed breakdown, architectural suitability, and trade-off analysis: **[PoC Hosting Cost Breakdown (Live Page)](https://rifaterdemsahin.github.io/k8s-kafka-edb-conflict-lab/costs.html)**
+
+---
+
 ## 🌐 Interactive Web Dashboard
 
-An interactive dashboard is available to visualize the architecture, node topology, Prometheus alerts, and benchmark results:
-- **GitHub Pages (Live):** [https://rifaterdemsahin.github.io/k8s-kafka-edb-conflict-lab/](https://rifaterdemsahin.github.io/k8s-kafka-edb-conflict-lab/)
+An interactive dashboard is available to visualize the architecture, node topology, Prometheus alerts, PoC costs, and benchmark results:
+- **GitHub Pages (Live Dashboard):** [https://rifaterdemsahin.github.io/k8s-kafka-edb-conflict-lab/](https://rifaterdemsahin.github.io/k8s-kafka-edb-conflict-lab/)
+- **PoC Hosting Cost Options (Live Page):** [https://rifaterdemsahin.github.io/k8s-kafka-edb-conflict-lab/costs.html](https://rifaterdemsahin.github.io/k8s-kafka-edb-conflict-lab/costs.html)
 - **Local / Codespaces URL:** [http://localhost:30085/index.html](http://localhost:30085/index.html)
+- **Local PoC Costs URL:** [http://localhost:30085/costs.html](http://localhost:30085/costs.html)
